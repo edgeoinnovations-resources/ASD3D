@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ASD Campus 3D</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: full-bleed 3D canvas; one floating control panel on the left, a readout strip bottom-right. */
+:root{
+  --bg:#efe9df; --panel:rgba(252,250,246,.94); --fg:#1f1b17; --muted:#6d655b; --line:#d9d1c4;
+  --accent:#8c1d2b; --accent-soft:#f2dde0; --ok:#2d6a4f; --warn:#b4661a;
+  --font-display:"Barlow Condensed","Arial Narrow",sans-serif; --font-body:"IBM Plex Sans",system-ui,sans-serif; --font-mono:"IBM Plex Mono",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --bg:#17171a; --panel:rgba(30,30,34,.94); --fg:#ece7df; --muted:#a39b90; --line:#3a3a40; --accent:#e0707f; --accent-soft:#3b2226; --ok:#7bc99b; --warn:#e3a05a; color-scheme:dark } }
+:root[data-theme="dark"]{ --bg:#17171a; --panel:rgba(30,30,34,.94); --fg:#ece7df; --muted:#a39b90; --line:#3a3a40; --accent:#e0707f; --accent-soft:#3b2226; --ok:#7bc99b; --warn:#e3a05a; color-scheme:dark }
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 var(--font-body);overflow:hidden}
+#stage{position:fixed;inset:0;display:block;touch-action:none}
+#stage canvas{display:block}
+.panel{position:fixed;top:max(12px,env(safe-area-inset-top,0px));left:max(12px,env(safe-area-inset-left,0px));width:min(320px,calc(100vw - 24px));max-height:calc(100% - 24px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 8px 30px rgba(0,0,0,.18);backdrop-filter:blur(8px);display:flex;flex-direction:column}
+.panel header{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:12px 14px 8px;border-bottom:1px solid var(--line)}
+.panel h1{font:600 24px/1 var(--font-display);margin:0;letter-spacing:.3px;text-transform:uppercase}
+.panel h1 small{display:block;font:500 12px/1.3 var(--font-body);color:var(--muted);text-transform:none;letter-spacing:0;margin-top:4px}
+#collapse{border:1px solid var(--line);background:transparent;color:var(--fg);border-radius:4px;padding:2px 8px;cursor:pointer;font:500 12px var(--font-body)}
+.body{display:flex;flex-direction:column;gap:0}
+details{border-bottom:1px solid var(--line)}
+details:last-child{border-bottom:0}
+summary{cursor:pointer;padding:9px 14px;font:600 13px var(--font-display);letter-spacing:.8px;text-transform:uppercase;color:var(--muted);list-style:none;display:flex;justify-content:space-between}
+summary::after{content:"+";font-weight:400}
+details[open] summary::after{content:"–"}
+.sec{padding:4px 14px 12px;display:flex;flex-direction:column;gap:6px}
+label.row{display:flex;align-items:center;gap:8px;cursor:pointer}
+label.row input{accent-color:var(--accent);margin:0}
+label.row .sw{width:12px;height:12px;border-radius:2px;border:1px solid rgba(0,0,0,.2);flex:none}
+label.row span.t{flex:1}
+label.row span.n{font:12px var(--font-mono);color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:transparent;color:var(--fg);border-radius:999px;padding:3px 10px;cursor:pointer;font:500 12px var(--font-body)}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.slider{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.slider input{flex:1;accent-color:var(--accent)}
+#search{width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid var(--line);border-radius:4px;background:transparent;color:var(--fg);font:13px var(--font-body)}
+#search:focus,button:focus-visible,.chip:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+#results{display:flex;flex-direction:column;gap:2px;max-height:160px;overflow:auto}
+#results button{text-align:left;border:0;background:transparent;color:var(--fg);padding:4px 6px;border-radius:3px;cursor:pointer;font:13px var(--font-body);display:flex;justify-content:space-between;gap:8px}
+#results button:hover{background:var(--accent-soft)}
+#results button span{color:var(--muted);font:12px var(--font-mono)}
+.info{position:fixed;right:max(12px,env(safe-area-inset-right,0px));bottom:max(12px,env(safe-area-inset-bottom,0px));width:min(300px,calc(100vw - 24px));background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 8px 30px rgba(0,0,0,.18);backdrop-filter:blur(8px);padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.info .kicker{font:600 12px var(--font-display);letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
+.info .big{font:600 22px/1.1 var(--font-display)}
+.info dl{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin:0;font-size:12px}
+.info dt{color:var(--muted)}
+.info dd{margin:0;font-family:var(--font-mono);font-variant-numeric:tabular-nums;word-break:break-all}
+.note{font-size:12px;color:var(--muted);line-height:1.4}
+.note b{color:var(--fg)}
+#loading{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px 18px;font:500 14px var(--font-body);box-shadow:0 8px 30px rgba(0,0,0,.18)}
+#loading .bar{height:4px;background:var(--line);border-radius:2px;margin-top:8px;overflow:hidden}
+#loading .bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}
+.src{font-size:12px;display:grid;grid-template-columns:auto 1fr;gap:2px 8px}
+.src b{font-weight:500}
+.src i{font-style:normal;color:var(--muted)}
+.badge{display:inline-block;font:500 11px var(--font-mono);padding:1px 6px;border-radius:3px;background:var(--accent-soft);color:var(--accent)}
+.panel.min .body{display:none}
+@media (max-width:600px){ .panel{width:calc(100vw - 24px)} .info{width:calc(100vw - 24px)} }
+@media (prefers-reduced-motion: reduce){ *{transition:none!important} }
+</style>
+
+</head><body>
+<div id="stage"></div>
+
+<aside class="panel" id="panel">
+  <header>
+    <h1>ASD Campus 3D<small>American School of Dubai, Al Barsha. World frame = UTM zone 40N.</small></h1>
+    <button id="collapse" aria-label="Collapse panel">Hide</button>
+  </header>
+  <div class="body">
+    <details open>
+      <summary>Layers</summary>
+      <div class="sec" id="layers"></div>
+    </details>
+    <details open>
+      <summary>Floor plans</summary>
+      <div class="sec">
+        <div class="chips" id="bchips"></div>
+        <div class="chips" id="fchips"></div>
+        <div class="slider"><span>Floor spacing</span><input type="range" id="explode" min="1" max="4" step="0.5" value="1"><span id="explodeV">×1</span></div>
+        <label class="row"><input type="checkbox" id="xray"><span class="t">See-through buildings</span></label>
+      </div>
+    </details>
+    <details open>
+      <summary>Find a room</summary>
+      <div class="sec">
+        <input id="search" type="search" placeholder="Room code or name, e.g. B204, LIBRARY" autocomplete="off">
+        <div id="results"></div>
+      </div>
+    </details>
+    <details>
+      <summary>Go to</summary>
+      <div class="sec chips" id="presets"></div>
+    </details>
+    <details>
+      <summary>Sources &amp; caveats</summary>
+      <div class="sec">
+        <div class="src">
+          <b>Massing</b><i>2019_09 ASD Existing Site Model.skp (Sept 2019, georeferenced): building blocks, trees and shade structures</i>
+          <b>F Block</b><i>3D F Block.dwg (Revit export, 2024)</i>
+          <b>Site plan</b><i>SITE PLAN_LEVEL G.dwg</i>
+          <b>Rooms</b><i>24 floor-plan DWGs, ASD_AREAS polygons + room tags</i>
+          <b>Levels</b><i>FFL +0.00 / +4.20 / +8.40 from elevation drawings; F Block +4.25 / +8.45</i>
+          <b>Imagery</b><i>DigitalGlobe snapshot stored inside the SketchUp file</i>
+        </div>
+        <p class="note">Each floor plan was fitted to the site plan by matching shared CAD linework. Fit confidence is shown per room as <span class="badge">match</span> (share of plan vertices landing within 15 mm of site-plan vertices). Floors with low scores were placed through their ground floor and may be a few metres off. The Revit Phase 1 model is not included; it needs Revit or an IFC export.</p>
+      </div>
+    </details>
+  </div>
+</aside>
+
+<div class="info" id="info">
+  <div class="kicker" id="infoKicker">Click a room or the ground</div>
+  <div class="big" id="infoTitle">ASD campus</div>
+  <dl id="infoList"></dl>
+</div>
+
+<div id="loading">Loading campus model<div class="bar"><i id="loadBar"></i></div></div>
+
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const E0 = 316698.8071145426, N0 = 2777263.3759915796;
+const BCOL = { 'A':0x1f6f8b, 'B':0xb8562c, 'C&D':0x6a994e, 'E':0x8c1d2b, 'F':0x7b5aa6, 'CAR PARK':0x6d665c };
+const BNAME = { 'A':'Building A', 'B':'Building B', 'C&D':'Buildings C & D', 'E':'Building E', 'F':'F Block', 'CAR PARK':'Employee car park' };
+
+// UTM zone 40N inverse (WGS84)
+function utmToLatLon(E, N){
+  const a=6378137, f=1/298.257223563, k0=0.9996, lon0=57*Math.PI/180;
+  const e2=f*(2-f), ep2=e2/(1-e2), e1=(1-Math.sqrt(1-e2))/(1+Math.sqrt(1-e2));
+  const x=E-500000, y=N, M=y/k0, mu=M/(a*(1-e2/4-3*e2*e2/64-5*e2*e2*e2/256));
+  const phi1=mu+(3*e1/2-27*e1**3/32)*Math.sin(2*mu)+(21*e1*e1/16-55*e1**4/32)*Math.sin(4*mu)+(151*e1**3/96)*Math.sin(6*mu);
+  const s=Math.sin(phi1), c=Math.cos(phi1), t=Math.tan(phi1), N1=a/Math.sqrt(1-e2*s*s), T1=t*t, C1=ep2*c*c, R1=a*(1-e2)/Math.pow(1-e2*s*s,1.5), D=x/(N1*k0);
+  const lat=phi1-(N1*t/R1)*(D*D/2-(5+3*T1+10*C1-4*C1*C1-9*ep2)*D**4/24+(61+90*T1+298*C1+45*T1*T1-252*ep2-3*C1*C1)*D**6/720);
+  const lon=lon0+(D-(1+2*T1+C1)*D**3/6+(5-2*C1+28*T1-3*C1*C1+8*ep2+24*T1*T1)*D**5/120)/c;
+  return [lat*180/Math.PI, lon*180/Math.PI];
+}
+
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace; stage.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0xdfe6ec); scene.fog = new THREE.Fog(0xdfe6ec, 900, 2200);
+const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 1, 6000);
+camera.position.set(-260, 260, 420);
+const controls = new OrbitControls(camera, renderer.domElement); controls.target.set(20, 0, -10); controls.maxPolarAngle = Math.PI/2 - 0.02; controls.minDistance = 15; controls.maxDistance = 2500; controls.enableDamping = true;
+scene.add(new THREE.HemisphereLight(0xffffff, 0xb9a98c, 0.9));
+const sun = new THREE.DirectionalLight(0xfff4e0, 1.6); sun.position.set(-250, 420, 180); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left:-450, right:450, top:450, bottom:-450, near:50, far:1200 }); sun.shadow.bias = -0.0005; scene.add(sun);
+
+// ground planes (snapshot extent from SketchUp: ±328.2 m east-west, ±268.6 m north-south about the origin)
+const texLoader = new THREE.TextureLoader();
+function groundPlane(url, w, h, y, opacity, name){
+  const tex = texLoader.load(url); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshLambertMaterial({ map: tex, transparent: opacity < 1 || name==='siteplan', opacity }));
+  m.rotation.x = -Math.PI/2; m.position.y = y; m.receiveShadow = true; m.name = name; scene.add(m); return m;
+}
+const layers = {};
+layers.satellite = groundPlane('snapshot.png', 656.4, 537.14, 0, 1, 'satellite');
+layers.siteplan = groundPlane('siteplan_world.png', 656.4, 537.2, 0.12, 1, 'siteplan');
+layers.siteplan.material.depthWrite = false;
+const base = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), new THREE.MeshLambertMaterial({ color: 0xcfc4ad })); base.rotation.x = -Math.PI/2; base.position.y = -0.3; base.receiveShadow = true; scene.add(base);
+
+// GLB layers
+const gltf = new GLTFLoader(); const loadBar = document.getElementById('loadBar'); let loaded = 0; const toLoad = 4;
+function tick(){ loaded++; loadBar.style.width = Math.round(100*loaded/toLoad) + '%'; if (loaded >= toLoad) document.getElementById('loading').hidden = true; }
+const massingMats = [];
+function toGLB(js){
+  const uri = js.buffers[0].uri; const b64 = uri.slice(uri.indexOf(',') + 1); const raw = atob(b64);
+  const bin = new Uint8Array(raw.length); for (let i = 0; i < raw.length; i++) bin[i] = raw.charCodeAt(i);
+  delete js.buffers[0].uri; js.buffers[0].byteLength = bin.length;
+  const enc = new TextEncoder().encode(JSON.stringify(js)); const jp = (4 - enc.length % 4) % 4; const bp = (4 - bin.length % 4) % 4;
+  const total = 12 + 8 + enc.length + jp + 8 + bin.length + bp; const buf = new ArrayBuffer(total); const dv = new DataView(buf); const u8 = new Uint8Array(buf);
+  dv.setUint32(0, 0x46546C67, true); dv.setUint32(4, 2, true); dv.setUint32(8, total, true);
+  let o = 12; dv.setUint32(o, enc.length + jp, true); dv.setUint32(o + 4, 0x4E4F534A, true); o += 8; u8.set(enc, o); for (let i = 0; i < jp; i++) u8[o + enc.length + i] = 0x20; o += enc.length + jp;
+  dv.setUint32(o, bin.length + bp, true); dv.setUint32(o + 4, 0x004E4942, true); o += 8; u8.set(bin, o);
+  return buf;
+}
+async function loadGLB(url, key, opts){
+  try {
+    const js = await (await fetch(url)).json(); const buf = toGLB(js);
+    gltf.parse(buf, '', g => {
+      const root = g.scene; root.name = key;
+      root.traverse(o => { if (o.isMesh){ o.castShadow = opts.shadow !== false; o.receiveShadow = true; o.userData.layer = key;
+        if (opts.color){ o.material = new THREE.MeshStandardMaterial({ color: opts.color, roughness: .9, metalness: 0, side: THREE.DoubleSide }); }
+        o.material.side = THREE.DoubleSide; if (opts.xray) massingMats.push(o.material); } });
+      root.visible = !!opts.visible; scene.add(root); layers[key] = root; tick();
+    }, err => { console.error('parse failed', url, err); tick(); });
+  } catch (err){ console.error('load failed', url, err); tick(); }
+}
+loadGLB('campus_proposed.gltf.json', 'existing', { visible: true, xray: true });
+loadGLB('campus_existing.gltf.json', 'landscape', { visible: true, xray: false });
+loadGLB('fblock.gltf.json', 'fblock', { visible: true, xray: true });
+loadGLB('location_terrain.gltf.json', 'terrain', { visible: false, shadow: false });
+
+// Room floor plans
+const data = await (await fetch('data.json')).json();
+const roomGroup = new THREE.Group(); scene.add(roomGroup); const roomMeshes = []; const edgeMat = new THREE.LineBasicMaterial({ color: 0x222222, transparent: true, opacity: .55 });
+for (const r of data.rooms){
+  const shape = new THREE.Shape(r.xy.map(p => new THREE.Vector2(p[0], p[1])));
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.35, bevelEnabled: false });
+  const mat = new THREE.MeshStandardMaterial({ color: BCOL[r.b] || 0x888888, roughness: .8, transparent: true, opacity: .85 });
+  const m = new THREE.Mesh(geo, mat); m.rotation.x = -Math.PI/2; m.userData = { room: r }; m.castShadow = false;
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 20), edgeMat); m.add(edges);
+  roomGroup.add(m); roomMeshes.push(m);
+}
+let explode = 1;
+function placeRooms(){ for (const m of roomMeshes){ const r = m.userData.room; m.position.y = r.z * explode + 0.05 * r.f; } }
+placeRooms();
+
+// Building labels
+function labelSprite(text, color){
+  const c = document.createElement('canvas'); c.width = 512; c.height = 128; const x = c.getContext('2d');
+  x.font = '600 72px "Barlow Condensed", "Arial Narrow", sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.lineWidth = 10; x.strokeStyle = 'rgba(255,255,255,.9)'; x.strokeText(text, 256, 64); x.fillStyle = color; x.fillText(text, 256, 64);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true })); s.scale.set(60, 15, 1); return s;
+}
+const bboxes = {}; for (const r of data.rooms){ const b = bboxes[r.b] ||= { minx:1e9, maxx:-1e9, miny:1e9, maxy:-1e9 }; for (const p of r.xy){ b.minx=Math.min(b.minx,p[0]); b.maxx=Math.max(b.maxx,p[0]); b.miny=Math.min(b.miny,p[1]); b.maxy=Math.max(b.maxy,p[1]); } }
+const labelGroup = new THREE.Group(); scene.add(labelGroup);
+for (const [b, bb] of Object.entries(bboxes)){ const s = labelSprite(BNAME[b], '#' + BCOL[b].toString(16).padStart(6,'0')); s.position.set((bb.minx+bb.maxx)/2, 28, -(bb.miny+bb.maxy)/2); labelGroup.add(s); }
+layers.labels = labelGroup; layers.rooms = roomGroup;
+
+// Layer UI
+const layerDefs = [
+  ['satellite', 'Satellite imagery (2019 snapshot)', '#6b7f5a'], ['siteplan', 'CAD site plan, level G', '#333'], ['existing', 'Buildings, 2019 massing', '#c8b89a'],
+  ['fblock', 'F Block, 3D model', '#9fb6c9'], ['landscape', 'Trees, shade structures, landscape (2019)', '#8a9a5b'], ['terrain', 'Terrain mesh', '#b6a27e'], ['rooms', 'Room polygons', '#8c1d2b'], ['labels', 'Building labels', '#555']
+];
+const layersEl = document.getElementById('layers');
+const defaults = { satellite:true, siteplan:true, existing:true, fblock:true, landscape:true, terrain:false, rooms:true, labels:true };
+for (const [k, name, sw] of layerDefs){
+  const l = document.createElement('label'); l.className = 'row'; l.innerHTML = `<input type="checkbox" id="ly_${k}"><span class="sw" style="background:${sw}"></span><span class="t">${name}</span>`;
+  const cb = l.querySelector('input'); cb.checked = defaults[k];
+  cb.addEventListener('change', () => { if (layers[k]) layers[k].visible = cb.checked; });
+  layersEl.appendChild(l);
+}
+const applyVis = setInterval(() => { for (const [k] of layerDefs) if (layers[k]) layers[k].visible = document.getElementById('ly_' + k).checked; if (loaded >= toLoad) clearInterval(applyVis); }, 500);
+
+// Floor plan filters
+const bchips = document.getElementById('bchips'), fchips = document.getElementById('fchips');
+const bState = Object.fromEntries(Object.keys(BNAME).map(b => [b, true])); let fState = 0; // 0 = all
+function chip(parent, text, pressed, onClick){ const b = document.createElement('button'); b.className = 'chip'; b.textContent = text; b.setAttribute('aria-pressed', pressed); b.addEventListener('click', () => onClick(b)); parent.appendChild(b); return b; }
+for (const b of Object.keys(BNAME)) chip(bchips, b, true, el => { bState[b] = !bState[b]; el.setAttribute('aria-pressed', bState[b]); filterRooms(); });
+const fbtns = [0,1,2,3].map(f => chip(fchips, f ? 'Floor ' + f : 'All floors', f === 0, () => { fState = f; fbtns.forEach((x, i) => x.setAttribute('aria-pressed', i === f)); filterRooms(); }));
+function filterRooms(){ for (const m of roomMeshes){ const r = m.userData.room; m.visible = bState[r.b] && (fState === 0 || r.f === fState); } }
+document.getElementById('explode').addEventListener('input', e => { explode = +e.target.value; document.getElementById('explodeV').textContent = '×' + explode; placeRooms(); });
+document.getElementById('xray').addEventListener('change', e => { for (const m of massingMats){ m.transparent = e.target.checked; m.opacity = e.target.checked ? .3 : 1; m.depthWrite = !e.target.checked; m.needsUpdate = true; } });
+
+// Presets
+const presets = document.getElementById('presets');
+function flyTo(cx, cz, radius, cy = 0){ controls.target.set(cx, cy, cz); camera.position.set(cx - radius * .8, radius * .9 + cy, cz + radius * 1.1); controls.update(); }
+chip(presets, 'Overview', false, () => flyTo(20, -10, 420));
+for (const [b, bb] of Object.entries(bboxes)) chip(presets, BNAME[b], false, () => flyTo((bb.minx+bb.maxx)/2, -(bb.miny+bb.maxy)/2, Math.max(bb.maxx-bb.minx, bb.maxy-bb.miny) * 1.1 + 30));
+
+// Search
+const search = document.getElementById('search'), results = document.getElementById('results');
+search.addEventListener('input', () => {
+  const q = search.value.trim().toUpperCase(); results.replaceChildren(); if (q.length < 2) return;
+  const hits = data.rooms.filter(r => r.code.includes(q) || r.label.toUpperCase().includes(q)).slice(0, 30);
+  for (const r of hits){ const b = document.createElement('button'); b.innerHTML = `<span style="color:var(--fg);font-family:var(--font-body)">${r.code || r.label.slice(0, 28)}</span><span>${BNAME[r.b]} · F${r.f} · ${r.area} m²</span>`;
+    b.addEventListener('click', () => { const m = roomMeshes[data.rooms.indexOf(r)]; select(m); const c = centroid(r.xy); flyTo(c[0], -c[1], 60, r.z * explode); }); results.appendChild(b); }
+});
+function centroid(xy){ let x = 0, y = 0; for (const p of xy){ x += p[0]; y += p[1]; } return [x / xy.length, y / xy.length]; }
+
+// Picking
+const ray = new THREE.Raycaster(), ptr = new THREE.Vector2(); let selected = null;
+const infoK = document.getElementById('infoKicker'), infoT = document.getElementById('infoTitle'), infoL = document.getElementById('infoList');
+function setInfo(k, t, rows){ infoK.textContent = k; infoT.textContent = t; infoL.replaceChildren(); for (const [a, b] of rows){ const dt = document.createElement('dt'); dt.textContent = a; const dd = document.createElement('dd'); dd.textContent = b; infoL.append(dt, dd); } }
+function coordRows(x, y){ const E = E0 + x, N = N0 + y; const [lat, lon] = utmToLatLon(E, N); return [['UTM 40N', `${E.toFixed(1)} E  ${N.toFixed(1)} N`], ['Lat / Lon', `${lat.toFixed(6)}, ${lon.toFixed(6)}`], ['Local (m)', `${x.toFixed(1)}, ${y.toFixed(1)}`]]; }
+function select(m){ if (selected){ selected.material.emissive.setHex(0); } selected = m; if (!m) return; m.material.emissive.setHex(0xffffff); m.material.emissiveIntensity = .35;
+  const r = m.userData.room; const c = centroid(r.xy);
+  setInfo(`${BNAME[r.b]} · floor ${r.f} · level +${r.z.toFixed(2)} m`, r.code || r.label || 'Unnamed space', [['Label', r.label || '(no tag)'], ['Area', r.area + ' m²'], ...coordRows(c[0], c[1])]); }
+let downAt = null;
+renderer.domElement.addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 4) return;
+  ptr.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); ray.setFromCamera(ptr, camera);
+  const hitRooms = ray.intersectObjects(roomMeshes.filter(m => m.visible && roomGroup.visible), false);
+  if (hitRooms.length){ select(hitRooms[0].object); return; }
+  const others = ray.intersectObjects(scene.children.filter(o => o !== roomGroup && o !== labelGroup && o.visible), true);
+  if (others.length){ const p = others[0].point; const o = others[0].object; const lay = o.userData.layer || o.name || 'ground'; const names = { existing:'Building (2019 massing)', fblock:'F Block · ' + (o.name || ''), landscape:'Landscape (2019)', satellite:'Ground', siteplan:'Ground', terrain:'Terrain' };
+    select(null); setInfo(names[lay] || 'Ground', `${p.y > 0.5 ? 'Height ' + p.y.toFixed(1) + ' m' : 'Ground level'}`, coordRows(p.x, -p.z)); }
+});
+
+document.getElementById('collapse').addEventListener('click', e => { const p = document.getElementById('panel'); p.classList.toggle('min'); e.target.textContent = p.classList.contains('min') ? 'Show' : 'Hide'; });
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+</script>
+
+</body></html>
